@@ -1,0 +1,39 @@
+from turtle import *
+pensize(5)
+penup()
+goto(0,-300)
+pendown()
+begin_fill()
+circle(300,180)
+circle(150,180)
+circle(-150,180)
+end_fill()
+circle(-300,180)
+color('white')
+penup()
+goto(0,100)
+pendown()
+begin_fill()
+circle(50)
+end_fill()
+color('black')
+penup()
+goto(0,-100)
+pendown()
+begin_fill()
+circle(-50)
+end_fill()
+hideturtle()
+done()
+
+
+- 👋 Hi, I’m @wxbgit
+- 👀 I’m interested in ...
+- 🌱 I’m currently learning ...
+- 💞️ I’m looking to collaborate on ...
+- 📫 How to reach me ...
+
+<!---
+wxbgit/wxbgit is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+You can click the Preview link to take a look at your changes.
+--->

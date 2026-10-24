@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="theme-color" content="#1f6fb2">
+    <title>{% block title %}药师工作台{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body data-timeout="{{ session_timeout or 30 }}">
+{% if current_user %}
+<header class="app-header">
+    <div>
+        <div class="title">药师工作台</div>
+        <div class="sub">{{ current_user.name }}（{{ current_user.work_no }}）·
+            {{ '管理员' if current_user.role == 'admin' else '药师' }} · {{ current_user.department or '未设置药房' }}</div>
+    </div>
+    <div class="actions">
+        <button class="btn-ghost" onclick="logout()">退出</button>
+    </div>
+</header>
+{% endif %}
+
+<main class="app-main">
+    {% if error %}<div class="card" style="text-align:center;color:#d9534f">{{ error }}</div>{% endif %}
+    {% block content %}{% endblock %}
+</main>
+
+{% if current_user %}
+<nav class="tabbar">
+    <a href="/"><span class="icon">🏠</span>首页</a>
+    <a href="/handover"><span class="icon">📝</span>交接班</a>
+    <a href="/history"><span class="icon">📚</span>历史</a>
+    <a href="/verify"><span class="icon">🔒</span>验证</a>
+    {% if is_admin %}<a href="/users"><span class="icon">👥</span>用户</a>{% endif %}
+</nav>
+{% endif %}
+
+<div id="toast"></div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

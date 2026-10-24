@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block title %}记录详情 · 药师工作台{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="card"><div class="empty">{{ error }}</div></div>
+{% else %}
+{% set r = record %}
+<div class="card">
+    <h3 class="card-title">No.{{ r.id }} 交接班记录
+        <small>{{ r.department }} · {{ r.handover_time }}</small></h3>
+    <table class="preview-table">
+        <tr><th>交班药师</th><td>{{ r.handover_name or '-' }}</td></tr>
+        <tr><th>接班药师</th><td>{{ r.receive_name or '-' }}</td></tr>
+        <tr><th>交接时间</th><td>{{ r.handover_time or '-' }}</td></tr>
+        <tr><th>所在药房</th><td>{{ r.department or '-' }}</td></tr>
+        <tr><th>药房温度</th><td>{{ r.temperature or '-' }} ℃</td></tr>
+        <tr><th>药房湿度</th><td>{{ r.humidity or '-' }} %</td></tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3 class="card-title">冰箱温湿度</h3>
+    {% set fridges = (r.fridge_data or {}).get('list', []) %}
+    {% if fridges %}
+    <div class="table-wrap">
+        <table class="grid">
+            <tr><th>冰箱</th><th>温度(℃)</th><th>湿度(%)</th><th>状态</th></tr>
+            {% for f in fridges %}
+            <tr>
+                <td>{{ f.name }}</td><td>{{ f.temperature }}</td><td>{{ f.humidity }}</td>
+                <td>{% if f.normal == '异常' %}<span class="tag tag-danger">异常</span>{% else %}<span class="tag tag-ok">正常</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}<div class="empty">无记录</div>{% endif %}
+</div>
+
+<div class="card">
+    <h3 class="card-title">麻精药品</h3>
+    {% set n = r.narcotic_info or {} %}
+    <table class="preview-table">
+        <tr><th>在库品种数</th><td>{{ n.get('variety_count', '-') }}</td></tr>
+        <tr><th>在库数量</th><td>{{ n.get('stock_qty', '-') }}</td></tr>
+        <tr><th>空安瓿回收数</th><td>{{ n.get('empty_ampoule', '-') }}</td></tr>
+        <tr><th>保险柜状态</th><td>{{ n.get('safe_status', '-') }}</td></tr>
+        <tr><th>备注</th><td>{{ n.get('remark', '-') }}</td></tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3 class="card-title">普通药品</h3>
+    {% set nm = r.normaldruginfo or {} %}
+    <table class="preview-table">
+        <tr><th>在库品种总数</th><td>{{ nm.get('variety_total', '-') }}</td></tr>
+        <tr><th>在库总数量</th><td>{{ nm.get('stock_total', '-') }}</td></tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3 class="card-title">高警示药品</h3>
+    {% set ha = (r.highalertdrugs or {}).get('list', []) %}
+    {% if ha %}
+    <div class="table-wrap">
+        <table class="grid">
+            <tr><th>名称</th><th>规格</th><th>数量</th><th>单位</th><th>位置</th></tr>
+            {% for d in ha %}
+            <tr><td>{{ d.name }}</td><td>{{ d.spec }}</td><td>{{ d.qty }}</td><td>{{ d.unit }}</td><td>{{ d.location }}</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}<div class="empty">无记录</div>{% endif %}
+</div>
+
+<div class="card">
+    <h3 class="card-title">发药机状态 / 待办 / 异常</h3>
+    {% set m = r.machine_status or {} %}
+    {% set p = r.pending_items or {} %}
+    {% set a = r.abnormal_events or {} %}
+    <table class="preview-table">
+        <tr><th>快速发药机余量</th><td>{{ m.get('fast_machine', '-') }} %</td></tr>
+        <tr><th>智能药架余量</th><td>{{ m.get('smart_shelf', '-') }} %</td></tr>
+        <tr><th>未审核处方</th><td>{{ p.get('unreviewed_rx', '-') }}</td></tr>
+        <tr><th>未调配处方</th><td>{{ p.get('undispensed_rx', '-') }}</td></tr>
+        <tr><th>待退药单</th><td>{{ p.get('return_orders', '-') }}</td></tr>
+        <tr><th>待处理医嘱</th><td>{{ p.get('pending_advice', '-') }}</td></tr>
+        <tr><th>异常事件</th><td>{{ (a.get('events') or ['无']) | join('、') }}</td></tr>
+        <tr><th>异常描述</th><td>{{ a.get('detail', '-') }}</td></tr>
+        <tr><th>交接留言</th><td>{{ r.handover_note or '-' }}</td></tr>
+    </table>
+</div>
+
+{% if r['items'] %}
+<div class="card">
+    <h3 class="card-title">库存快照 <small>近效期≤90天标红</small></h3>
+    <div class="table-wrap">
+        <table class="grid">
+            <tr><th>药品名称</th><th>规格</th><th>批号</th><th>有效期</th><th>数量</th><th>单位</th><th>类型</th><th>位置</th></tr>
+            {% for it in r['items'] %}
+            <tr class="{{ 'near-expiry' if it.near_expiry else '' }}">
+                <td>{{ it.drug_name }}{% if it.near_expiry %} <span class="badge-near">近效期</span>{% endif %}</td>
+                <td>{{ it.spec }}</td><td>{{ it.batch_no }}</td><td>{{ it.expiry_date }}</td>
+                <td>{{ it.stock_qty }}</td><td>{{ it.unit }}</td><td>{{ it.drug_type }}</td><td>{{ it.location }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <h3 class="card-title">双方电子签名</h3>
+    <div class="form-row">
+        <div class="form-item">
+            <label>交班药师签名</label>
+            {% if r.handover_sign %}<img src="{{ r.handover_sign }}" style="width:100%;border:1px solid #dfe7ee;border-radius:8px;background:#fff">
+            {% else %}<div class="empty">无</div>{% endif %}
+        </div>
+        <div class="form-item">
+            <label>接班药师签名</label>
+            {% if r.receive_sign %}<img src="{{ r.receive_sign }}" style="width:100%;border:1px solid #dfe7ee;border-radius:8px;background:#fff">
+            {% else %}<div class="empty">无</div>{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">防篡改信息</h3>
+    <div class="hash-text">PDF 文件哈希：{{ r.pdf_hash or '未生成' }}</div>
+    <div class="hash-text" style="margin-top:6px">记录内容指纹：{{ r.content_hash or '未生成' }}</div>
+    <div style="margin-top:10px">
+        <button class="btn btn-sm" onclick="verifyRecord({{ r.id }})">验证完整性</button>
+    </div>
+    <div id="verifyResult" style="margin-top:10px"></div>
+</div>
+
+<div class="card">
+    <div class="form-row">
+        <button class="btn" onclick="location.href='/api/handover/export_pdf/{{ r.id }}'">导出PDF</button>
+        <button class="btn btn-outline" onclick="location.href='/api/handover/export_excel/{{ r.id }}'">导出Excel</button>
+        <button class="btn btn-outline" onclick="window.open('/api/handover/export_pdf/{{ r.id }}?inline=1')">预览PDF</button>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function verifyRecord(id) {
+        api('/api/handover/verify/' + id).then(d => {
+            document.getElementById('verifyResult').innerHTML =
+                `<div class="tip-item ${d.valid ? '' : 'high'}">
+                    ${d.valid ? '✅' : '❌'} ${d.message}<br>
+                    <span class="hash-text">库内哈希：${d.stored_file_hash || '-'}</span><br>
+                    <span class="hash-text">当前哈希：${d.current_file_hash || '-'}</span>
+                 </div>`;
+        });
+    }
+</script>
+{% endblock %}

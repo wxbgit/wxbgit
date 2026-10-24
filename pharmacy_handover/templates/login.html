@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}登录 · 药师工作台{% endblock %}
+
+{% block content %}
+<div class="login-wrap">
+    <div class="login-card">
+        <h1>药师交接班系统</h1>
+        <div class="sub">医院内网专用 · 请使用工号登录</div>
+        <form id="loginForm">
+            <div class="form-item">
+                <label>工号 <span class="req">*</span></label>
+                <input type="text" id="work_no" name="work_no" placeholder="如 1001" autocomplete="username" required>
+            </div>
+            <div class="form-item">
+                <label>密码 <span class="req">*</span></label>
+                <input type="password" id="password" name="password" placeholder="请输入密码" autocomplete="current-password" required>
+            </div>
+            <div class="form-item">
+                <label>验证码 <span class="req">*</span></label>
+                <div class="captcha-row">
+                    <input type="text" id="captcha" placeholder="右侧图形验证码" autocomplete="off">
+                    <img id="captchaImg" alt="验证码" title="点击刷新">
+                </div>
+            </div>
+            <button class="btn btn-block" type="submit" id="btnLogin">登 录</button>
+        </form>
+        <div style="text-align:center;margin-top:14px">
+            <a href="javascript:void(0)" id="btnReg">药师注册（需管理员审核）</a>
+        </div>
+        <div style="margin-top:14px;font-size:12px;color:#7d8b96;line-height:1.7">
+            提示：首次使用请联系管理员开通账号；登录状态 30 分钟无操作将自动退出。
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function refreshCaptcha() {
+        fetch('/api/captcha').then(r => r.json()).then(j => {
+            document.getElementById('captchaImg').src = j.data.image;
+        });
+    }
+    document.getElementById('captchaImg').addEventListener('click', refreshCaptcha);
+    refreshCaptcha();
+
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnLogin');
+        btn.disabled = true; btn.textContent = '登录中...';
+        fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                work_no: document.getElementById('work_no').value.trim(),
+                password: document.getElementById('password').value.trim(),
+                captcha: document.getElementById('captcha').value.trim()
+            })
+        }).then(r => r.json()).then(j => {
+            btn.disabled = false; btn.textContent = '登 录';
+            if (j.code === 0) {
+                toast('登录成功');
+                setTimeout(() => { location.href = '/'; }, 400);
+            } else {
+                toast(j.msg); refreshCaptcha();
+            }
+        }).catch(() => { btn.disabled = false; btn.textContent = '登 录'; });
+    });
+
+    document.getElementById('btnReg').addEventListener('click', function () {
+        modal(`
+            <h3>药师注册</h3>
+            <div class="form-item"><label>工号 *</label><input type="text" id="r_work_no" placeholder="如 1003"></div>
+            <div class="form-item"><label>姓名 *</label><input type="text" id="r_name"></div>
+            <div class="form-item"><label>密码 *（≥6位）</label><input type="password" id="r_pwd"></div>
+            <div class="form-item"><label>所属药房</label><input type="text" id="r_dept" placeholder="如 门诊药房"></div>
+            <div class="form-item"><label>手机号</label><input type="tel" id="r_phone"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal(this.closest('.modal-mask'))">取消</button>
+                <button class="btn" id="r_submit">提交注册</button>
+            </div>`, {
+            onMount(mask) {
+                mask.querySelector('#r_submit').addEventListener('click', function () {
+                    fetch('/api/register', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            work_no: mask.querySelector('#r_work_no').value.trim(),
+                            name: mask.querySelector('#r_name').value.trim(),
+                            password: mask.querySelector('#r_pwd').value.trim(),
+                            department: mask.querySelector('#r_dept').value.trim(),
+                            phone: mask.querySelector('#r_phone').value.trim()
+                        })
+                    }).then(r => r.json()).then(j => {
+                        toast(j.msg);
+                        if (j.code === 0) { closeModal(mask); }
+                    });
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}

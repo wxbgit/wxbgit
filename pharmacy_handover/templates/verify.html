@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}PDF验证 · 药师工作台{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3 class="card-title">上传 PDF 验证完整性</h3>
+    <div style="font-size:12.5px;color:#7d8b96;line-height:1.7;margin-bottom:12px">
+        上传由本系统导出的交接班 PDF，系统将计算文件 SHA256 并与数据库中的存证哈希比对，
+        文件被任何修改都会导致校验失败。
+    </div>
+    <div class="form-item">
+        <input type="file" id="fileInput" accept="application/pdf,.pdf">
+    </div>
+    <button class="btn btn-block" onclick="uploadVerify()">开始验证</button>
+    <div id="result" style="margin-top:14px"></div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">按记录编号验证</h3>
+    <div class="form-row">
+        <div class="form-item">
+            <label>记录编号</label>
+            <input type="number" id="recordId" placeholder="如 1">
+        </div>
+        <div class="form-item" style="flex:0 0 100px;display:flex;align-items:flex-end">
+            <button class="btn" onclick="verifyById()">验证</button>
+        </div>
+    </div>
+    <div id="result2"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function renderResult(box, valid, html) {
+        document.getElementById(box).innerHTML =
+            `<div class="tip-item ${valid ? '' : 'high'}">${valid ? '✅' : '❌'} ${html}</div>`;
+    }
+
+    function uploadVerify() {
+        const input = document.getElementById('fileInput');
+        if (!input.files.length) { toast('请先选择 PDF 文件'); return; }
+        const fd = new FormData();
+        fd.append('file', input.files[0]);
+        fetch('/api/verify/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(r => r.json()).then(j => {
+                if (j.code !== 0) { renderResult('result', false, j.msg); return; }
+                const d = j.data;
+                let html = d.message;
+                if (d.valid) {
+                    html += `<br>记录编号：No.${d.record_id}　药房：${d.department}　交接时间：${d.handover_time}
+                             <br><a href="/detail/${d.record_id}">查看记录详情</a>`;
+                }
+                html += `<br><span class="hash-text">本次文件哈希：${d.file_hash}</span>`;
+                renderResult('result', d.valid, html);
+            });
+    }
+
+    function verifyById() {
+        const id = document.getElementById('recordId').value.trim();
+        if (!id) { toast('请输入记录编号'); return; }
+        api('/api/handover/verify/' + id).then(d => {
+            renderResult('result2', d.valid, `${d.message}<br>
+                <span class="hash-text">库内文件哈希：${d.stored_file_hash || '-'}</span><br>
+                <span class="hash-text">当前文件哈希：${d.current_file_hash || '-'}</span><br>
+                <span class="hash-text">内容指纹：${d.current_content_hash}</span>`);
+        });
+    }
+</script>
+{% endblock %}

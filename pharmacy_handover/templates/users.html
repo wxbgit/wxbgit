@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}用户管理 · 药师工作台{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3 class="card-title">药师账号</h3>
+    <div class="form-row">
+        <div class="form-item">
+            <label>搜索（工号/姓名/科室）</label>
+            <input type="text" id="kw" placeholder="输入关键字">
+        </div>
+        <div class="form-item" style="flex:0 0 90px;display:flex;align-items:flex-end">
+            <button class="btn" onclick="loadUsers()">搜索</button>
+        </div>
+        <div class="form-item" style="flex:0 0 110px;display:flex;align-items:flex-end">
+            <button class="btn btn-success" onclick="addUser()">+ 新增用户</button>
+        </div>
+    </div>
+</div>
+
+<div id="userBox"><div class="empty">加载中...</div></div>
+
+<div class="card">
+    <h3 class="card-title">操作日志 <small>最近 50 条</small></h3>
+    <div id="logBox"><div class="empty">加载中...</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadUsers() {
+        api('/api/users?keyword=' + encodeURIComponent(document.getElementById('kw').value.trim()))
+            .then(d => {
+                const box = document.getElementById('userBox');
+                if (!d.list.length) { box.innerHTML = '<div class="empty">暂无用户</div>'; return; }
+                box.innerHTML = d.list.map(u => `
+                    <div class="list-item">
+                        <div class="row1">
+                            <div class="name">${u.name} <small style="color:#7d8b96">（${u.work_no}）</small></div>
+                            <span class="tag ${u.status == 1 ? 'tag-ok' : 'tag-danger'}">${u.status == 1 ? '已启用' : (u.status == 0 ? '待审核/停用' : '停用')}</span>
+                        </div>
+                        <div class="meta">
+                            角色：${u.role === 'admin' ? '管理员' : '药师'} · 科室：${u.department || '-'} · 手机：${u.phone || '-'}<br>
+                            创建时间：${u.created_at || '-'}
+                        </div>
+                        <div class="form-row" style="margin-top:10px;margin-bottom:0">
+                            <button class="btn btn-sm btn-outline" onclick="editUser(${u.id}, '${u.name}', '${u.role}', '${u.department || ''}', '${u.phone || ''}', ${u.status})">编辑</button>
+                            <button class="btn btn-sm ${u.status == 1 ? 'btn-warning' : 'btn-success'}" onclick="toggleStatus(${u.id}, ${u.status})">${u.status == 1 ? '停用' : '审核开通'}</button>
+                            <button class="btn btn-sm btn-danger" onclick="resetPwd(${u.id})">重置密码</button>
+                        </div>
+                    </div>`).join('');
+            }).catch(() => {});
+    }
+
+    function loadLogs() {
+        api('/api/logs?limit=50').then(d => {
+            const box = document.getElementById('logBox');
+            if (!d.list.length) { box.innerHTML = '<div class="empty">暂无日志</div>'; return; }
+            box.innerHTML = d.list.map(l => `
+                <div class="tip-item" style="background:#f6f9fc;border-left-color:#1f6fb2">
+                    <span class="tag">[${l.action}]</span>${l.user_name || '匿名'}：${l.detail || ''}
+                    <div class="hash-text">${l.ip_address || '-'} · ${l.created_at}</div>
+                </div>`).join('');
+        }).catch(() => {});
+    }
+
+    function userForm(u) {
+        const isEdit = !!u;
+        const deptOptions = {{ (departments or []) | tojson }};
+        modal(`
+            <h3>${isEdit ? '编辑用户' : '新增用户'}</h3>
+            <div class="form-item"><label>工号 *</label><input type="text" id="u_work_no" value="${u ? u.work_no : ''}" ${isEdit ? 'readonly class="readonly"' : ''}></div>
+            <div class="form-item"><label>姓名 *</label><input type="text" id="u_name" value="${u ? u.name : ''}"></div>
+            ${isEdit ? '' : '<div class="form-item"><label>初始密码</label><input type="text" id="u_pwd" value="123456"></div>'}
+            <div class="form-item"><label>角色</label>
+                <select id="u_role">
+                    <option value="pharmacist" ${u && u.role === 'pharmacist' ? 'selected' : ''}>普通药师</option>
+                    <option value="admin" ${u && u.role === 'admin' ? 'selected' : ''}>管理员</option>
+                </select>
+            </div>
+            <div class="form-item"><label>所属药房</label>
+                <select id="u_dept">${deptOptions.map(d => `<option value="${d}" ${u && u.department === d ? 'selected' : ''}>${d}</option>`).join('')}</select>
+            </div>
+            <div class="form-item"><label>手机号</label><input type="tel" id="u_phone" value="${u ? (u.phone || '') : ''}"></div>
+            <div class="form-item"><label>状态</label>
+                <select id="u_status">
+                    <option value="1" ${u && u.status == 1 ? 'selected' : ''}>启用</option>
+                    <option value="0" ${u && u.status == 0 ? 'selected' : ''}>停用</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal(this.closest('.modal-mask'))">取消</button>
+                <button class="btn" id="u_save">保存</button>
+            </div>`, {
+            onMount(mask) {
+                mask.querySelector('#u_save').addEventListener('click', function () {
+                    const body = {
+                        work_no: mask.querySelector('#u_work_no').value.trim(),
+                        name: mask.querySelector('#u_name').value.trim(),
+                        role: mask.querySelector('#u_role').value,
+                        department: mask.querySelector('#u_dept').value,
+                        phone: mask.querySelector('#u_phone').value.trim(),
+                        status: parseInt(mask.querySelector('#u_status').value, 10)
+                    };
+                    if (!isEdit) { body.password = mask.querySelector('#u_pwd').value.trim(); }
+                    const url = isEdit ? '/api/users/' + u.id : '/api/users';
+                    fetch(url, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                    }).then(r => r.json()).then(j => {
+                        toast(j.msg);
+                        if (j.code === 0) { closeModal(mask); loadUsers(); }
+                    });
+                });
+            }
+        });
+    }
+
+    function addUser() { userForm(null); }
+
+    function editUser(id, name, role, department, phone, status) {
+        userForm({ id: id, name: name, role: role, department: department, phone: phone, status: status });
+    }
+
+    function toggleStatus(id, status) {
+        const next = status == 1 ? 0 : 1;
+        fetch('/api/users/' + id, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: next })
+        }).then(r => r.json()).then(j => { toast(j.msg); loadUsers(); });
+    }
+
+    function resetPwd(id) {
+        const pwd = prompt('请输入新密码（默认 123456）：', '123456');
+        if (!pwd) return;
+        fetch('/api/users/' + id + '/reset_password', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pwd })
+        }).then(r => r.json()).then(j => { toast(j.msg); });
+    }
+
+    loadUsers();
+    loadLogs();
+</script>
+{% endblock %}

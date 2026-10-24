@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}历史记录 · 药师工作台{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3 class="card-title">查询条件</h3>
+    <div class="form-row">
+        <div class="form-item">
+            <label>开始日期</label>
+            <input type="date" id="f_start">
+        </div>
+        <div class="form-item">
+            <label>结束日期</label>
+            <input type="date" id="f_end">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-item">
+            <label>药房</label>
+            <select id="f_dept">
+                <option value="">全部</option>
+                {% for d in departments %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="form-item">
+            <label>药师（姓名/工号）</label>
+            <input type="text" id="f_kw" placeholder="如 张药师 / 1001">
+        </div>
+    </div>
+    <div class="form-row">
+        <button class="btn" onclick="page=1;loadList()">查 询</button>
+        <button class="btn btn-outline" onclick="resetFilter()">重 置</button>
+        {% if is_admin %}
+        <button class="btn btn-success" onclick="exportBatch()">导出Excel</button>
+        {% endif %}
+    </div>
+</div>
+
+<div id="listBox"><div class="empty">加载中...</div></div>
+<div class="pager">
+    <button class="btn btn-outline btn-sm" onclick="goPage(-1)">上一页</button>
+    <span class="pagination-info" id="pageInfo">-</span>
+    <button class="btn btn-outline btn-sm" onclick="goPage(1)">下一页</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let page = 1, pages = 1;
+
+    function buildQuery() {
+        const p = new URLSearchParams();
+        p.set('page', page);
+        p.set('per_page', 20);
+        const s = document.getElementById('f_start').value;
+        const e = document.getElementById('f_end').value;
+        const d = document.getElementById('f_dept').value;
+        const k = document.getElementById('f_kw').value.trim();
+        if (s) p.set('start_date', s);
+        if (e) p.set('end_date', e);
+        if (d) p.set('department', d);
+        if (k) p.set('keyword', k);
+        return p.toString();
+    }
+
+    function loadList() {
+        api('/api/handover/list?' + buildQuery()).then(d => {
+            pages = d.pages || 1;
+            document.getElementById('pageInfo').textContent = `第 ${d.page}/${pages} 页 · 共 ${d.total} 条`;
+            const box = document.getElementById('listBox');
+            if (!d.list.length) { box.innerHTML = '<div class="empty">没有符合条件的记录</div>'; return; }
+            box.innerHTML = d.list.map(r => `
+                <div class="list-item" onclick="location.href='/detail/${r.id}'">
+                    <div class="row1">
+                        <div class="name">No.${r.id} ${r.handover_name || '-'} → ${r.receive_name || '-'}</div>
+                        <span class="tag">${r.department || '-'}</span>
+                    </div>
+                    <div class="meta">
+                        交接时间：${r.handover_time || '-'}<br>
+                        温度：${r.temperature || '-'}℃　湿度：${r.humidity || '-'}%　
+                        ${r.pdf_hash ? '<span class="tag tag-ok">已存证</span>' : '<span class="tag tag-danger">未存证</span>'}
+                    </div>
+                </div>`).join('');
+        }).catch(() => {
+            document.getElementById('listBox').innerHTML = '<div class="empty">加载失败</div>';
+        });
+    }
+
+    function goPage(delta) {
+        page = Math.min(Math.max(1, page + delta), pages);
+        loadList();
+    }
+
+    function resetFilter() {
+        document.getElementById('f_start').value = '';
+        document.getElementById('f_end').value = '';
+        document.getElementById('f_dept').value = '';
+        document.getElementById('f_kw').value = '';
+        page = 1; loadList();
+    }
+
+    function exportBatch() {
+        location.href = '/api/handover/export_batch?' + buildQuery();
+    }
+
+    loadList();
+</script>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}首页 · 药师工作台{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3 class="card-title">本班次概览 <small id="updateTime"></small></h3>
+    <div class="stat-grid">
+        <div class="stat-box"><div class="num" id="s_today">0</div><div class="label">今日交接</div></div>
+        <div class="stat-box"><div class="num" id="s_month">0</div><div class="label">本月交接</div></div>
+        <div class="stat-box"><div class="num" id="s_total">0</div><div class="label">累计记录</div></div>
+        <div class="stat-box"><div class="num" id="s_near">0</div><div class="label">近效期品种</div></div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">待办提醒 <small>来自最近一次交接班</small></h3>
+    <div id="pendingBox" class="stat-grid">
+        <div class="stat-box"><div class="num" id="p_1">0</div><div class="label">未审核处方</div></div>
+        <div class="stat-box"><div class="num" id="p_2">0</div><div class="label">未调配处方</div></div>
+        <div class="stat-box"><div class="num" id="p_3">0</div><div class="label">待退药单</div></div>
+        <div class="stat-box"><div class="num" id="p_4">0</div><div class="label">待处理医嘱</div></div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">接班建议 <small>规则引擎自动生成</small></h3>
+    <div id="tipsBox"><div class="empty">暂无建议</div></div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">快捷操作</h3>
+    <div class="quick-grid">
+        <a class="quick-item" href="/handover"><span class="icon">📝</span>发起交接班</a>
+        <a class="quick-item" href="/history"><span class="icon">📚</span>历史记录</a>
+        <a class="quick-item" href="/verify"><span class="icon">🔒</span>PDF验证</a>
+        {% if is_admin %}<a class="quick-item" href="/users"><span class="icon">👥</span>用户管理</a>{% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">最近交接班</h3>
+    <div id="recentBox"><div class="empty">加载中...</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadStats() {
+        api('/api/dashboard/stats').then(d => {
+            document.getElementById('s_today').textContent = d.today_records || 0;
+            document.getElementById('s_month').textContent = d.month_records || 0;
+            document.getElementById('s_total').textContent = d.total_records || 0;
+            document.getElementById('s_near').textContent = d.near_expiry_count || 0;
+            document.getElementById('updateTime').textContent = '更新于 ' + (d.generated_at || '');
+            const p = d.pending_items || {};
+            document.getElementById('p_1').textContent = p.unreviewed_rx || 0;
+            document.getElementById('p_2').textContent = p.undispensed_rx || 0;
+            document.getElementById('p_3').textContent = p.return_orders || 0;
+            document.getElementById('p_4').textContent = p.pending_advice || 0;
+
+            const tips = d.suggestions || [];
+            const box = document.getElementById('tipsBox');
+            box.innerHTML = tips.length ? tips.map(t =>
+                `<div class="tip-item ${t.level}"><span class="tag">[${t.type}]</span>${t.text}</div>`
+            ).join('') : '<div class="empty">各项指标正常，暂无提醒</div>';
+        }).catch(() => {});
+    }
+
+    function loadRecent() {
+        api('/api/handover/list?page=1&per_page=5').then(d => {
+            const box = document.getElementById('recentBox');
+            if (!d.list.length) { box.innerHTML = '<div class="empty">暂无交接班记录</div>'; return; }
+            box.innerHTML = d.list.map(r => `
+                <div class="list-item" onclick="location.href='/detail/${r.id}'">
+                    <div class="row1">
+                        <div class="name">${r.handover_name || '-'} → ${r.receive_name || '-'}</div>
+                        <span class="tag">${r.department || '-'}</span>
+                    </div>
+                    <div class="meta">交接时间：${r.handover_time || '-'}</div>
+                </div>`).join('');
+        }).catch(() => {});
+    }
+
+    loadStats();
+    loadRecent();
+</script>
+{% endblock %}

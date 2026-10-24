@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% block title %}交接班 · 药师工作台{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3 class="card-title">一、基础信息 <small>系统自动采集</small></h3>
+    <div class="form-row">
+        <div class="form-item">
+            <label>交班药师</label>
+            <input type="text" id="handoverUser" class="readonly" readonly>
+        </div>
+        <div class="form-item">
+            <label>交接时间</label>
+            <input type="text" id="handoverTime" class="readonly" readonly>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-item">
+            <label>所在药房 <span class="req">*</span></label>
+            <select id="department">
+                <option value="">请选择</option>
+                {% for d in departments %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="form-item">
+            <label>位置来源</label>
+            <input type="text" id="deptSource" class="readonly" readonly value="手动选择">
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">二、接班确认 <small>二选一</small></h3>
+    <div class="switches">
+        <button class="btn btn-sm active" id="modePwd">工号密码交接</button>
+        <button class="btn btn-sm" id="modeQr">扫码交接</button>
+    </div>
+    <div id="qrInfo"></div>
+
+    <div id="pwdBox">
+        <div class="form-row">
+            <div class="form-item">
+                <label>接班药师工号</label>
+                <input type="text" id="receiveWorkNo" placeholder="如 1002" autocomplete="off">
+            </div>
+            <div class="form-item">
+                <label>接班药师密码</label>
+                <input type="password" id="receivePwd" placeholder="由接班药师本人输入" autocomplete="off">
+            </div>
+        </div>
+        <div style="font-size:12px;color:#7d8b96">由接班药师本人输入工号与密码完成身份确认。</div>
+    </div>
+
+    <div id="qrBox" style="display:none">
+        <div class="form-row">
+            <button class="btn btn-outline" onclick="QRHandover.generate(document.getElementById('department').value)">生成交接二维码</button>
+        </div>
+        <div style="font-size:12px;color:#7d8b96;line-height:1.7">
+            交班药师点击生成二维码 → 接班药师扫码打开本页并填写签名提交。
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">三、药房环境 <small>温湿度</small></h3>
+    <div class="form-row">
+        <div class="form-item">
+            <label>药房温度（℃）</label>
+            <input type="number" id="temperature" step="0.1" placeholder="如 23.5">
+        </div>
+        <div class="form-item">
+            <label>药房湿度（%）</label>
+            <input type="number" id="humidity" step="0.1" placeholder="如 55">
+        </div>
+    </div>
+    <div style="margin:6px 0;font-size:12.5px;color:#7d8b96">冰箱温湿度（每个冰箱独立记录）</div>
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+            <tr><th>冰箱</th><th>温度(℃)</th><th>湿度(%)</th><th>判定</th><th>操作</th></tr>
+            </thead>
+            <tbody id="fridgeBody"></tbody>
+        </table>
+    </div>
+    <button class="btn btn-sm btn-outline" id="btnAddFridge" style="margin-top:8px">+ 添加冰箱</button>
+</div>
+
+<div class="card">
+    <h3 class="card-title">四、麻精药品</h3>
+    <div class="form-row">
+        <div class="form-item"><label>在库品种数</label><input type="number" id="narVariety"></div>
+        <div class="form-item"><label>在库数量</label><input type="number" id="narQty"></div>
+    </div>
+    <div class="form-row">
+        <div class="form-item"><label>空安瓿回收数</label><input type="number" id="narAmpoule"></div>
+        <div class="form-item">
+            <label>保险柜状态</label>
+            <select id="narSafe">{% for s in safe_status %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select>
+        </div>
+    </div>
+    <div class="form-item"><label>备注</label><input type="text" id="narRemark"></div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">五、普通药品 <small>近效期≤90天自动标红</small></h3>
+    <div class="form-row">
+        <div class="form-item"><label>在库品种总数</label><input type="number" id="norVariety"></div>
+        <div class="form-item"><label>在库总数量</label><input type="number" id="norQty"></div>
+    </div>
+    <div class="form-row">
+        <button class="btn btn-sm btn-outline" id="btnImportLast">导入上一班次库存快照</button>
+    </div>
+    <div class="table-wrap" style="margin-top:8px">
+        <table class="grid">
+            <thead>
+            <tr><th>药品名称</th><th>规格</th><th>批号</th><th>有效期</th><th>数量</th><th>单位</th><th>类型</th><th>存放位置</th><th>操作</th></tr>
+            </thead>
+            <tbody id="invBody"></tbody>
+        </table>
+    </div>
+    <button class="btn btn-sm btn-outline" id="btnAddInv" style="margin-top:8px">+ 添加药品</button>
+</div>
+
+<div class="card">
+    <h3 class="card-title">六、高警示药品</h3>
+    <div class="table-wrap">
+        <table class="grid">
+            <thead>
+            <tr><th>药品名称</th><th>规格</th><th>在库数量</th><th>单位</th><th>存放位置</th><th>操作</th></tr>
+            </thead>
+            <tbody id="haBody"></tbody>
+        </table>
+    </div>
+    <button class="btn btn-sm btn-outline" id="btnAddHa" style="margin-top:8px">+ 添加药品</button>
+    <datalist id="haList">
+        {% for d in high_alert_drugs %}<option value="{{ d }}"></option>{% endfor %}
+    </datalist>
+</div>
+
+<div class="card">
+    <h3 class="card-title">七、发药机状态</h3>
+    <div class="form-row">
+        <div class="form-item"><label>快速发药机余量（%）</label><input type="number" id="fastMachine"></div>
+        <div class="form-item"><label>智能药架余量（%）</label><input type="number" id="smartShelf"></div>
+    </div>
+    <div class="form-item"><label>备注</label><input type="text" id="machineRemark"></div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">八、待办事项</h3>
+    <div class="form-row">
+        <div class="form-item"><label>未审核处方数</label><input type="number" id="pUnreviewed" value="0"></div>
+        <div class="form-item"><label>未调配处方数</label><input type="number" id="pUndispensed" value="0"></div>
+    </div>
+    <div class="form-row">
+        <div class="form-item"><label>待退药单数</label><input type="number" id="pReturn" value="0"></div>
+        <div class="form-item"><label>待处理医嘱数</label><input type="number" id="pAdvice" value="0"></div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">九、异常事件 <small>可多选</small></h3>
+    <div class="checkbox-group" id="abnormalBox">
+        {% for e in abnormal_events %}
+        <label><input type="checkbox" value="{{ e }}"> {{ e }}</label>
+        {% endfor %}
+    </div>
+    <div class="form-item" style="margin-top:10px">
+        <label>异常描述</label>
+        <textarea id="abnormalDetail" placeholder="勾选异常事件后填写具体情况"></textarea>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">十、交接留言</h3>
+    <textarea id="handoverNote" placeholder="如：3床患者明天出院需备药"></textarea>
+</div>
+
+<div class="card">
+    <h3 class="card-title">十一、双方手写签名 <span class="req">*</span></h3>
+    <div class="form-item">
+        <label>交班药师签名</label>
+        <div class="sign-box">
+            <canvas id="signHandover"></canvas>
+            <div class="placeholder">请在此处手写签名</div>
+        </div>
+        <button class="btn btn-sm btn-outline" id="clearSign1" style="margin-top:6px">清除</button>
+    </div>
+    <div class="form-item" style="margin-top:12px">
+        <label>接班药师签名</label>
+        <div class="sign-box">
+            <canvas id="signReceive"></canvas>
+            <div class="placeholder">请在此处手写签名</div>
+        </div>
+        <button class="btn btn-sm btn-outline" id="clearSign2" style="margin-top:6px">清除</button>
+    </div>
+</div>
+
+<div class="card">
+    <button class="btn btn-block btn-success" id="btnPreview">预览并提交</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/signature.js') }}"></script>
+<script src="{{ url_for('static', filename='js/qrcode.js') }}"></script>
+<script src="{{ url_for('static', filename='js/handover.js') }}"></script>
+<script>
+    Handover.init({
+        fridges: {{ fridges | tojson }},
+        expiryDays: {{ expiry_days }},
+        highAlertDrugs: {{ high_alert_drugs | tojson }},
+        defaultDepartment: {{ default_department | tojson }}
+    });
+</script>
+{% endblock %}
